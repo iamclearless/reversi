@@ -1,0 +1,454 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <limits>
+#include <map>
+
+using namespace std;
+
+enum class Color : char
+{
+	white = 'O', black = 'X', none = '_'
+};
+
+struct Piece
+{
+	int eile;
+	int stulp;
+
+	Piece();
+	Piece(int x, int y);
+	bool insideSquare(int min, int max);
+};
+
+class gameBoard
+{
+	vector<vector<Color> > gameBoardPieces;
+	map<Color, int> gameScores;
+	vector<Piece> flips(Piece cell, Color color);
+
+public:
+	static const int size = 8;
+	gameBoard();
+	void initOthello();
+	void print();
+	map<Color, int> getScores();
+	bool isMoveLegal(Piece cell, Color color);
+	void makeMove(Piece cell, Color color);
+	int countFlips(Piece cell, Color color);
+	bool hasLegalMoves(Color color);
+
+};
+
+class Player
+{
+protected:
+	Color pieceColor;
+
+public:
+	virtual ~Player();
+	virtual void makeMove(gameBoard& board) = 0;
+	void setPieceColor(Color color);
+	Color getColor();
+};
+
+class Human_player : public Player
+{
+	bool isTurnFormatLegal(string turn, Piece& cell);
+	bool isTurnLegal(gameBoard& board, Piece cell);
+
+public:
+	void makeMove(gameBoard& board);
+};
+
+class Human_player2 : public Player
+{
+	bool isTurnFormatLegal(string turn, Piece& cell);
+	bool isTurnLegal(gameBoard& board, Piece cell);
+
+public:
+	void makeMove(gameBoard& board);
+};
+
+class Game
+{
+	gameBoard board;
+	Human_player human;
+	Human_player2 human2;
+	bool finished;
+
+	void createPlayers();
+	void printState();
+	void over();
+
+public:
+	void play();
+};
+
+Piece::Piece() {}
+Piece::Piece(int x, int y) : eile(x), stulp(y) {}
+bool Piece::insideSquare(int min, int max)
+{
+	return eile >= min && eile <= max && stulp >= min && stulp <= max;
+}
+
+vector<Piece> gameBoard::flips(Piece cell, Color color)
+{
+	vector<Piece> result;
+	for (int x = -1; x <= 1; ++x)
+	{
+		for (int y = -1; y <= 1; ++y)
+		{
+			if (x == 0 && y == 0)
+			{
+				continue;
+			}
+
+			Piece current(cell.eile + x, cell.stulp + y);
+			vector<Piece> tempFlips;
+			while (current.insideSquare(0, size - 1) && gameBoardPieces[current.eile][current.stulp] != Color::none && gameBoardPieces[current.eile][current.stulp] != color)
+			{
+				tempFlips.push_back(current);
+				current.eile += x;
+				current.stulp += y;
+			}
+
+			if (current.insideSquare(0, size - 1) && gameBoardPieces[current.eile][current.stulp] == color)
+			{
+				result.insert(result.end(), tempFlips.begin(), tempFlips.end());
+			}
+		}
+	}
+	return result;
+}
+
+gameBoard::gameBoard() : gameBoardPieces(size)
+{
+	for (int i = 0; i < size; ++i)
+	{
+		gameBoardPieces[i] = vector<Color>(size);
+	}
+}
+
+void gameBoard::initOthello()
+{
+	for (int i = 0; i < size; ++i)
+	{
+		for (int j = 0; j < size; ++j)
+		{
+			gameBoardPieces[i][j] = Color::none;
+		}
+	}
+
+	gameBoardPieces[3][3] = gameBoardPieces[4][4] = Color::white;
+	gameBoardPieces[3][4] = gameBoardPieces[4][3] = Color::black;
+
+	gameScores[Color::white] = 2;
+	gameScores[Color::black] = 2;
+}
+
+void gameBoard::print()
+{
+	cout << " ";
+	for (int i = 0; i < 2 * size + 1; ++i)
+	{
+		cout << "_";
+	}
+	cout << endl;
+
+	for (int i = 0; i < size; ++i)
+	{
+		cout << i + 1 << "I";
+		for (int j = 0; j < size; ++j)
+		{
+			if (j != 0)
+			{
+				cout << " ";
+			}
+			cout << char(gameBoardPieces[i][j]);
+		}
+		cout << "I" << endl;
+	}
+
+	cout << " I";
+	for (int i = 0; i < 2 * size - 1; ++i)
+	{
+		cout << "_";
+	}
+	cout << "I" << endl;
+	cout << " ";
+	for (int i = 0; i < size; i++)
+	{
+		cout << " " << char('a' + i);
+	}
+	cout << endl;
+}
+
+map<Color, int> gameBoard::getScores()
+{
+	return gameScores;
+}
+
+bool gameBoard::isMoveLegal(Piece cell, Color color)
+{
+	if (gameBoardPieces[cell.eile][cell.stulp] != Color::none)
+	{
+		return false;
+	}
+
+	if (countFlips(cell, color) == 0)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void gameBoard::makeMove(Piece cell, Color color)
+{
+	auto cells = flips(cell, color);
+	gameScores[color] += 1 + cells.size();
+	gameScores[gameBoardPieces[cells[0].eile][cells[0].stulp]] -= cells.size();
+
+	gameBoardPieces[cell.eile][cell.stulp] = color;
+	for (int i = 0; i < cells.size(); i++)
+	{
+		gameBoardPieces[cells[i].eile][cells[i].stulp] = color;
+	}
+}
+
+int gameBoard::countFlips(Piece cell, Color color)
+{
+	return flips(cell, color).size();
+}
+
+bool gameBoard::hasLegalMoves(Color color)
+{
+	for (int i = 0; i < size; ++i)
+	{
+		for (int j = 0; j < size; ++j)
+		{
+			if (isMoveLegal(Piece(i, j), color))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+Player::~Player() {}
+
+void Player::setPieceColor(Color _pieceColor)
+{
+	pieceColor = _pieceColor;
+}
+
+Color Player::getColor()
+{
+	return pieceColor;
+}
+
+bool Human_player::isTurnFormatLegal(string turn, Piece& cell)
+{
+	if (turn.length() != 2 || turn[0] < '1' || turn[0] > '8' || tolower(turn[1]) < 'a' || tolower(turn[1]) > 'h')
+	{
+		cout << "Turn format is illegal!" << endl;
+		return false;
+	}
+	cell.eile = turn[0] - '1';
+	cell.stulp = turn[1] - 'a';
+	return true;
+}
+
+bool Human_player2::isTurnFormatLegal(string turn, Piece& cell)
+{
+	if (turn.length() != 2 || turn[0] < '1' || turn[0] > '8' || tolower(turn[1]) < 'a' || tolower(turn[1]) > 'h')
+	{
+		cout << "Turn format is illegal!" << endl;
+		return false;
+	}
+	cell.eile = turn[0] - '1';
+	cell.stulp = turn[1] - 'a';
+	return true;
+}
+
+bool Human_player::isTurnLegal(gameBoard& board, Piece cell)
+{
+	if (!board.isMoveLegal(cell, pieceColor))
+	{
+		cout << "This move is illegal, P1!" << endl;
+		return false;
+	}
+	return true;
+}
+
+bool Human_player2::isTurnLegal(gameBoard& board, Piece cell)
+{
+	if (!board.isMoveLegal(cell, pieceColor))
+	{
+		cout << "This move is illegal, P2!" << endl;
+		return false;
+	}
+	return true;
+}
+
+void Human_player::makeMove(gameBoard& board)
+{
+	string turn;
+	Piece cell;
+	cout << "P1 turn: ";
+	cin >> turn;
+
+	while (!isTurnFormatLegal(turn, cell) || !isTurnLegal(board, cell))
+	{
+		cout << "P1 turn: ";
+		cin >> turn;
+	}
+
+	board.makeMove(cell, pieceColor);
+}
+
+
+void Human_player2::makeMove(gameBoard& board)
+{
+	string turn;
+	Piece cell;
+	cout << "P2 turn: ";
+	cin >> turn;
+
+	while (!isTurnFormatLegal(turn, cell) || !isTurnLegal(board, cell))
+	{
+		cout << "P2 turn: ";
+		cin >> turn;
+	}
+
+	board.makeMove(cell, pieceColor);
+}
+
+void Game::createPlayers()
+{
+	cout << "P1 - W/B: ";
+	char option;
+	cin >> option;
+	option = tolower(option);
+	while (option != 'w' && option != 'b')
+	{
+		cin.ignore(numeric_limits<std::streamsize>::max(), '\n');
+		cout << "Please type 'W' or 'B' : ";
+		cin >> option;
+		option = tolower(option);
+	}
+
+	if (option == 'w')
+	{
+		human.setPieceColor(Color::white);
+		human2.setPieceColor(Color::black);
+	}
+	else
+	{
+		human.setPieceColor(Color::black);
+		human2.setPieceColor(Color::white);
+	}
+}
+
+void Game::printState()
+{
+	cout << endl;
+	cout << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-" << endl;
+	auto scores = board.getScores();
+	cout << "Player1 : " << scores[human.getColor()] << " " << char(human.getColor()) << endl;
+	cout << "Player2 : " << scores[human2.getColor()] << " " << char(human2.getColor()) << endl;
+	board.print();
+	cout << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-" << endl;
+	cout << endl;
+}
+
+void Game::over()
+{
+	printState();
+	auto scores = board.getScores();
+	cout << "The game is now over. Scores: " << scores[human.getColor()] << ":" << scores[human2.getColor()] << endl;
+	if (scores[human.getColor()] == scores[human2.getColor()])
+	{
+		cout << "TIE!" << endl;
+	}
+	else
+	{
+		if (scores[human.getColor()] > scores[human2.getColor()])
+		{
+			cout << "P1, GG!" << endl;
+		}
+		else
+		{
+			cout << "P2, GG!" << endl;
+		}
+	}
+	cout << endl;
+}
+
+void Game::play()
+{
+	finished = false;
+	board.initOthello();
+	createPlayers();
+	auto turn = Color::black;
+
+	printState();
+	printState();
+
+	while (!finished)
+	{
+		Color next;
+		if (turn == human.getColor())
+		{
+			human.makeMove(board);
+			next = human2.getColor();
+		}
+		else
+		{
+			human2.makeMove(board);
+			next = human.getColor();
+		}
+
+		printState();
+
+		if (!board.hasLegalMoves(next))
+		{
+			if (!board.hasLegalMoves(turn))
+			{
+				finished = true;
+			}
+			else
+			{
+				cout << "No valid turns. Game passes to " << char(turn) << "." << endl;
+				next = turn;
+			}
+		}
+
+		turn = next;
+	}
+
+	over();
+}
+
+int main()
+{
+	Game game;
+	char option = 'y';
+	while (option == 'y')
+	{
+		game.play();
+
+		cout << "Retry, mortals? Y/N: ";
+		cin >> option;
+		option = tolower(option);
+		while (option != 'y' && option != 'n')
+		{
+			cin.ignore(numeric_limits<std::streamsize>::max(), '\n');
+			cout << "Invalid option. Y/N?: ";
+			cin >> option;
+			option = tolower(option);
+		}
+	}
+}
